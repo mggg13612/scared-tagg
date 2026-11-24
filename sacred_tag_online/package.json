@@ -1,0 +1,9 @@
+{
+  "name": "sacred-tag-online",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Online 2-player 2v2 tag fighting game starter",
+  "main": "server.js",
+  "scripts": {"start": "node server.js"},
+  "dependencies": {"express": "^4.21.2", "socket.io": "^4.8.1"}
+}

@@ -1,0 +1,45 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sacred Tag Fight Online</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101522;color:#f3f5fa;font-family:system-ui,sans-serif}main{max-width:980px;margin:24px auto;padding:16px}h1{margin:0 0 6px;color:#f5d78e}section{background:#1b2435;border:1px solid #35415a;border-radius:14px;padding:16px;margin:12px 0}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}input,select,button{font:inherit;border-radius:8px;padding:10px;border:1px solid #596780;background:#101827;color:white}button{cursor:pointer;background:#8c6425;border:0;font-weight:700}button:disabled{opacity:.4}canvas{width:100%;height:auto;background:#1a2638;border-radius:12px;border:1px solid #64728a;display:block}.muted{color:#b5bfd0;font-size:14px}.status{font-weight:700;color:#f5d78e}.teams{display:grid;grid-template-columns:1fr 1fr;gap:12px}.hidden{display:none}.controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.controls button{background:#35435b;min-width:48px}.health{height:12px;background:#4b2630;border-radius:8px;overflow:hidden}.health span{display:block;height:100%;background:#65c68a;width:100%}
+</style></head><body><main>
+<h1>⚔ SACRED TAG FIGHT — ONLINE</h1><div class="muted">2인 온라인 대전 · 2대2 태그 · CPU 없음</div>
+<section id="lobby">
+ <div class="teams">
+  <div><h3>내 팀 선택</h3><select id="a"><option value="buddha">석가모니</option><option value="jesus">예수</option><option value="mary">성모 마리아</option><option value="moses">모세</option></select> <select id="b"><option value="jesus">예수</option><option value="buddha">석가모니</option><option value="mary">성모 마리아</option><option value="moses">모세</option></select></div>
+  <div><h3>온라인 방</h3><div class="row"><button id="create">방 만들기</button><input id="roomcode" placeholder="방 코드" maxlength="4"><button id="join">친구 방 참가</button></div><p class="muted">방을 만든 뒤 표시되는 4자리 코드를 친구에게 공유하세요.</p></div>
+ </div>
+ <p class="status" id="status">서버에 연결 중…</p><div id="roominfo" class="muted"></div><button id="start" disabled>두 명 참가 완료 — 대전 시작</button>
+</section>
+<section id="arena" class="hidden">
+ <div class="row"><div style="flex:1"><b id="p1name">PLAYER 1</b><div class="health"><span id="hp1"></span></div></div><div style="flex:1"><b id="p2name">PLAYER 2</b><div class="health"><span id="hp2"></span></div></div></div>
+ <canvas id="game" width="960" height="440" tabindex="0"></canvas>
+ <div class="controls"><span class="muted">키보드: A/D 이동 · W 점프 · S/L 방어 · J 약공격 · K 강공격 · U/I 고유 스킬 · ; 태그</span></div>
+ <div class="controls" id="touch"><button data-k="left">◀</button><button data-k="right">▶</button><button data-k="jump">점프</button><button data-k="guard">방어</button><button data-k="light">J 약공격</button><button data-k="heavy">K 강공격</button><button data-k="skill1">U 스킬</button><button data-k="skill2">I 스킬</button><button data-k="tag">태그</button></div>
+ <p class="status" id="fightstatus">대전 중</p><button id="back">로비로</button>
+</section>
+</main><script src="/socket.io/socket.io.js"></script><script>
+const socket=io();let slot=null,room=null,phase="lobby",state=null,keys={},team=["buddha","jesus"];
+const $=id=>document.getElementById(id), names={buddha:"석가모니",jesus:"예수",mary:"성모 마리아",moses:"모세"};
+function selected(){return [$("a").value,$("b").value]}
+function setStatus(t){$("status").textContent=t}
+socket.on("connect",()=>setStatus("서버 연결 완료 — 방을 만들거나 참가하세요."));
+socket.on("connect_error",()=>setStatus("서버 연결 실패. 배포된 서버 주소를 확인하세요."));
+socket.on("room:update",r=>{room=r;$("roominfo").textContent=`방 코드: ${r.code} · P1 ${r.players[0].joined?"참가":"대기"} · P2 ${r.players[1].joined?"참가":"대기"} · 상태: ${r.phase}`;$("start").disabled=!(r.players[0].joined&&r.players[1].joined&&slot===0);if(r.phase==="fight"||r.phase==="result")showArena();});
+socket.on("state:update",s=>{state=s;draw();});
+socket.on("match:started",()=>{phase="fight";showArena();});
+function enter(result){if(!result.ok)return setStatus(result.error);slot=result.slot;room=result.room;setStatus(`방 ${result.code} 참가 완료 — ${slot===0?"PLAYER 1":"PLAYER 2"}`);$("roomcode").value=result.code;$("roominfo").textContent=`방 코드: ${result.code} · 친구에게 이 코드를 공유하세요.`; }
+$("create").onclick=()=>{team=selected();socket.emit("room:create",{team},enter)};
+$("join").onclick=()=>{team=selected();socket.emit("room:join",{code:$("roomcode").value,team},enter)};
+$("start").onclick=()=>socket.emit("match:start");
+function showArena(){$("lobby").classList.add("hidden");$("arena").classList.remove("hidden");$("game").focus();}
+$("back").onclick=()=>location.reload();
+function down(k){keys[k]=true}function up(k){keys[k]=false}
+window.addEventListener("keydown",e=>{let m={a:"left",d:"right",w:"jump",s:"guard",l:"guard",j:"light",k:"heavy",u:"skill1",i:"skill2",";":"tag"};let k=m[e.key.toLowerCase()];if(k){e.preventDefault();down(k)}});
+window.addEventListener("keyup",e=>{let m={a:"left",d:"right",w:"jump",s:"guard",l:"guard",j:"light",k:"heavy",u:"skill1",i:"skill2",";":"tag"};let k=m[e.key.toLowerCase()];if(k)up(k)});
+$("touch").querySelectorAll("button").forEach(b=>{let k=b.dataset.k;b.onpointerdown=e=>{e.preventDefault();down(k)};["pointerup","pointerleave","pointercancel"].forEach(ev=>b.addEventListener(ev,()=>up(k)))});
+setInterval(()=>{if(slot!==null&&phase!=="lobby"&&phase!=="result")socket.emit("input",keys)},33);
+const ctx=$("game").getContext("2d");
+function draw(){if(!state)return;ctx.clearRect(0,0,960,440);let g=ctx.createLinearGradient(0,0,0,440);g.addColorStop(0,"#22334a");g.addColorStop(1,"#111a2a");ctx.fillStyle=g;ctx.fillRect(0,0,960,440);ctx.fillStyle="#c4a56a";ctx.fillRect(0,365,960,75);ctx.fillStyle="#e8d5a5";ctx.font="18px system-ui";ctx.fillText("SACRED ARENA",410,42);
+state.fighters.forEach((f,i)=>{ctx.save();ctx.translate(f.x,365-f.y);ctx.fillStyle=i===0?"#e8bd70":"#8fc6ed";ctx.beginPath();ctx.arc(0,-72,24,0,Math.PI*2);ctx.fill();ctx.fillRect(-19,-48,38,58);ctx.fillStyle="#fff";ctx.font="bold 15px system-ui";ctx.textAlign="center";ctx.fillText(i===0?"PLAYER 1":"PLAYER 2",0,-110);ctx.fillText(f.guard?"GUARD":"",0,-125);ctx.restore();});$("hp1").style.width=state.fighters[0].hp+"%";$("hp2").style.width=state.fighters[1].hp+"%";if(room?.phase==="result")$("fightstatus").textContent=state.fighters[0].hp<=0?"PLAYER 2 승리!":"PLAYER 1 승리!";}
+draw();
+</script></body></html>
